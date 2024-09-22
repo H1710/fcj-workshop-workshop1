@@ -17,14 +17,17 @@ A 3-tier architecture typically consists of the following layers:
 3. **Data Layer**: This stores the application’s data, typically in a relational database like MySQL or PostgreSQL.
 
 For this workshop:
+
 - **Node.js with Express** will be used for the application layer.
 - **AWS EC2** instances will host our Node.js application.
 - **AWS RDS** (Relational Database Service) will host our database.
 - **AWS ElastiCache** will be used to cache data for improved performance.
-![alt text](Overview.png)
+  ![alt text](Overview.png)
+
 ### Workshop Outline
 
 1. **Set Up the AWS Environment**
+
    - Setting VPC
    - Launch an EC2 instance
    - Set up security groups
@@ -32,6 +35,7 @@ For this workshop:
    - Set up ElastiCache for caching
 
 2. **Build the Node.js Application**
+
    - Initialize a Node.js project
    - Set up Express
    - Connect to RDS
@@ -40,4 +44,3 @@ For this workshop:
 3. **Test the Application**
    - Verify the application functionality
    - Check caching and database connections
-

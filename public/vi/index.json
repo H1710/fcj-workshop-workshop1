@@ -1,0 +1,64 @@
+[
+{
+	"uri": "//localhost:1313/vi/1-networking/",
+	"title": "Cấu hình mạng",
+	"tags": [],
+	"description": "",
+	"content": "1 Khởi tạo VPC Tạo VPC\nCấu hình VPC\n"
+},
+{
+	"uri": "//localhost:1313/vi/2-setting-ec2/",
+	"title": "Khởi động một EC2 Instance",
+	"tags": [],
+	"description": "",
+	"content": "2. Khởi động một EC2 Instance Truy cập vào AWS Management Console.\nĐi tới EC2 và nhấp vào Launch Instance.\nChọn một Amazon Machine Image (AMI). Chọn Amazon Linux 2023 AMI (64-bit x86) mới nhất.\nChọn loại instance. t2.micro là đủ cho workshop này và đủ điều kiện cho tier miễn phí.\nCấu hình chi tiết instance:\nMạng: Chọn VPC mặc định. Subnet: Chọn một subnet mặc định. Tự động gán địa chỉ IP công cộng: Bật.\nCấu hình nhóm bảo mật: Tạo một nhóm bảo mật mới hoặc chọn một nhóm hiện có.\nSSH (cổng 22): Cho phép bạn kết nối vào instance bằng SSH. HTTP (cổng 80): Cho phép lưu lượng web đến ứng dụng của bạn. Quy tắc TCP tùy chỉnh (cổng 6379): Dành cho Redis nếu sử dụng ElastiCache với engine Redis. MySQL/Aurora (cổng 3306): Dành cho RDS nếu sử dụng engine cơ sở dữ liệu MySQL.\nKhởi động instance và tải về cặp khóa để truy cập SSH.\n"
+},
+{
+	"uri": "//localhost:1313/vi/3-setting-rds/",
+	"title": "Khởi động một RDS Instance",
+	"tags": [],
+	"description": "",
+	"content": "3. Khởi động một RDS Instance Truy cập vào [AWS Launch RDS Instance Console].\nCấu hình RDS Networking.\nKhởi động instance.\nTải về tệp RPM:\nsudo wget https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm "
+},
+{
+	"uri": "//localhost:1313/vi/4-setting-redis/",
+	"title": "Khởi động Redis",
+	"tags": [],
+	"description": "",
+	"content": "4. Khởi động Redis Truy cập vào bảng điều khiển Elastic Cache\nKhởi động Redis Cluster\nCấu hình mạng cho Redis\nTải về và thiết lập redis-cli:\nsudo yum install redis6 -y "
+},
+{
+	"uri": "//localhost:1313/vi/5-setting-nodejs/",
+	"title": "Cài đặt máy chủ ExpressJS",
+	"tags": [],
+	"description": "",
+	"content": "5. Cài đặt máy chủ nodejs SSH EC2 Cài đặt Node.js and npm 2.1 Cập nhật system packages: sudo yum update sudo yum upgrade 2.2 Cài đặt Node.js and npm:\ncurl --silent --location https://rpm.nodesource.com/setup_20.x | bash - sudo yum -y install nodejs ** Kiểm tra phiên bản nodejs and npm**\nnode -v npm -v Tạo app quản lý người dùng 3.1 Tạo đường dẫn cho app: mkdir user-management cd user-management 3.2 Khởi tạo app: npm init -y 3.3 Cài đặt dependencies:\nnpm install express mysql2 redis dotenv express: Web framework. mysql2: MySQL client for connecting to RDS. redis: Redis client for ElastiCache. dotenv: For managing environment variables ** Check package.json ** cat package.json 3.4 Create Environment Variables\nTạo .env file trong thư mục gốc để set biến môi trường. vi .env Thêm cái biến môi trường dưới đây vào file .env: DB_HOST=your-rds-endpoint DB_USER=your-db-username DB_PASSWORD=your-db-password DB_NAME=your-db-name REDIS_HOST=your-elasticache-endpoint REDIS_PORT=6379 3.5 Tạo kết nối MySQL và Redis\nTạo kết nối MySQL vi db.js Thêm câu hình const mysql = require(\u0026#39;mysql2/promise\u0026#39;); require(\u0026#39;dotenv\u0026#39;).config(); const pool = mysql.createPool({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, }); module.exports = pool; Tạo kết nối Redis vi redis.js Thêm câu hình const redis = require(\u0026#34;redis\u0026#34;); require(\u0026#34;dotenv\u0026#34;).config(); const client = redis.createClient({ url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}` }); client.on(\u0026#34;connect\u0026#34;, () =\u0026gt; { console.log(\u0026#34;Connected to Redis\u0026#34;); }); client.on(\u0026#34;error\u0026#34;, (err) =\u0026gt; { console.error(\u0026#34;Redis error:\u0026#34;, err); }); client.connect(); module.exports = client; 3.6 Tạo User Management API\nTạo the main API trong server.js. vi server.js Thêm code vào file const express = require(\u0026#39;express\u0026#39;); const pool = require(\u0026#39;./db\u0026#39;); const redisClient = require(\u0026#39;./redis\u0026#39;); const app = express(); app.use(express.json()); // Get all users (with caching) app.get(\u0026#39;/users\u0026#39;, async (req, res) =\u0026gt; { try { const cacheKey = \u0026#39;users\u0026#39;; // Check Redis cache first const cachedUsers = await redisClient.get(cacheKey); if (cachedUsers) { return res.json(JSON.parse(cachedUsers)); } // If not in cache, query MySQL const [users] = await pool.query(\u0026#39;SELECT * FROM users\u0026#39;); // Cache the result in Redis for 60 seconds await redisClient.set(cacheKey, JSON.stringify(users), { EX: 60, }); res.json(users); } catch (err) { res.status(500).json({ error: \u0026#39;Failed to retrieve users\u0026#39; }); } }); // Create a new user app.post(\u0026#39;/users\u0026#39;, async (req, res) =\u0026gt; { const { name, email } = req.body; try { const [result] = await pool.query(\u0026#39;INSERT INTO users (name, email) VALUES (?, ?)\u0026#39;, [name, email]); // Invalidate cache await redisClient.del(\u0026#39;all_users\u0026#39;); res.status(201).json({ id: result.insertId, name, email }); } catch (err) { res.status(500).json({ error: \u0026#39;Failed to create user\u0026#39; }); } }); // Start the server const PORT = process.env.PORT || 3000; app.listen(PORT, () =\u0026gt; { console.log(`Server running on port ${PORT}`); }); "
+},
+{
+	"uri": "//localhost:1313/vi/6-testing/",
+	"title": "Kết quả kiểm tra",
+	"tags": [],
+	"description": "",
+	"content": "6. Kết quả kiểm tra Gửi yêu cầu tới máy chủ EC2 để tạo người dùng. Khi tạo người dùng, bộ nhớ cache sẽ được làm mới.\nKiểm tra MySQL RDS.\nGửi yêu cầu tới máy chủ EC2 để lấy người dùng. Nếu Redis không còn dữ liệu, hệ thống sẽ ghi dữ liệu mới vào Redis.\nKiểm tra Redis.\n"
+},
+{
+	"uri": "//localhost:1313/vi/",
+	"title": "Xây dựng ứng dụng 3 tầng với Node.js, Express, EC2, AWS ElastiCache và AWS RDS",
+	"tags": [],
+	"description": "",
+	"content": "Xây dựng ứng dụng 3 tầng với Node.js, Express, EC2, AWS ElastiCache và AWS RDS Trong workshop này, chúng ta sẽ xây dựng một ứng dụng web 3 tầng sử dụng Node.js và Express. Ứng dụng sẽ được triển khai trên EC2 của AWS, với ElastiCache để cải thiện hiệu suất thông qua bộ nhớ đệm, và RDS (Relational Database Service) để quản lý cơ sở dữ liệu.\nKiến trúc 3 tầng là một mô hình kiến trúc phổ biến, được chia thành ba lớp chính:\nLớp trình bày (Presentation Layer): Đây là giao diện người dùng của ứng dụng, có thể là một trang web hoặc ứng dụng di động. Lớp ứng dụng (Application Layer): Nơi chứa logic nghiệp vụ của ứng dụng, thường được triển khai bằng các ngôn ngữ phía server như Node.js. Lớp dữ liệu (Data Layer): Lưu trữ dữ liệu của ứng dụng, thường là cơ sở dữ liệu quan hệ như MySQL hoặc PostgreSQL. Trong workshop này, chúng ta sẽ sử dụng:\nNode.js và Express cho lớp ứng dụng. AWS EC2 để host ứng dụng Node.js. AWS RDS để quản lý cơ sở dữ liệu quan hệ. AWS ElastiCache để lưu trữ cache, cải thiện hiệu suất truy cập dữ liệu. Qua workshop này, bạn sẽ học cách triển khai một ứng dụng web hoàn chỉnh và tối ưu hóa hiệu suất của nó bằng các dịch vụ AWS.\n"
+},
+{
+	"uri": "//localhost:1313/vi/categories/",
+	"title": "Categories",
+	"tags": [],
+	"description": "",
+	"content": ""
+},
+{
+	"uri": "//localhost:1313/vi/tags/",
+	"title": "Tags",
+	"tags": [],
+	"description": "",
+	"content": ""
+}]

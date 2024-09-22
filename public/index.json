@@ -1,0 +1,64 @@
+[
+{
+	"uri": "//localhost:1313/1-networking/",
+	"title": "Setting Networking",
+	"tags": [],
+	"description": "",
+	"content": "1. Launch a VPC Create VPC\nConfigure VPC\n"
+},
+{
+	"uri": "//localhost:1313/2-setting-ec2/",
+	"title": "Launch an EC2 Instance",
+	"tags": [],
+	"description": "",
+	"content": "2. Launch an EC2 Instance Go to the AWS Management Console.\nNavigate to EC2 and click on Launch Instance.\nChoose an Amazon Machine Image (AMI). Select the latest Amazon Linux 2023 AMI (64-bit x86).\nChoose an instance type. t2.micro is sufficient for this workshop and is eligible for the free tier.\nConfigure instance details:\nNetwork: Select the default VPC. Subnet: Select a default subnet. Auto-assign Public IP: Enable.\nConfigure security group: Create a new security group or select an existing one.\nSSH (port 22): Allows you to connect to the instance using SSH. HTTP (port 80): Allows web traffic to your application. Custom TCP Rule (port 6379): For Redis if using ElastiCache with Redis engine. MySQL/Aurora (port 3306): For RDS if using a MySQL database engine.\nLaunch the instance and download the key pair for SSH access.\n"
+},
+{
+	"uri": "//localhost:1313/3-setting-rds/",
+	"title": "Launch an RDS Instance",
+	"tags": [],
+	"description": "",
+	"content": "3. Launch a RDS Instance Go to the [AWS Launch RDS Instance Console]. Set RDS Networking Launch the instance. Download the RPM file sudo wget https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm Install RPM file sudo dnf install mysql80-community-release-el9-1.noarch.rpm -y You need the public key of mysql to install the software. sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 If you need server: sudo dnf install mysql-community-server -y SSH to EC2 Access RDS instance in EC2 mysql -h \u0026lt;Your Database Host\u0026gt; -P \u0026lt;Port\u0026gt; -u \u0026lt;Username\u0026gt; -p Create workshop database create database workshop; Create user table CREATE TABLE users ( id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) ); "
+},
+{
+	"uri": "//localhost:1313/4-setting-redis/",
+	"title": "Launch an Redis",
+	"tags": [],
+	"description": "",
+	"content": "4. Launch a Redis Go to Elastic Cache console Launch Redis Cluster Setting networking for redis Download and set up redis-cli sudo yum install redis6 -y Access Redis CLI redis6-cli -h \u0026lt;Redis_Cluster_Endpoint\u0026gt; -p \u0026lt;Redis_Port\u0026gt; --tls Check Redis CLI ping "
+},
+{
+	"uri": "//localhost:1313/5-setting-nodejs/",
+	"title": "Launch an Express Server",
+	"tags": [],
+	"description": "",
+	"content": "5. Setup nodejs server SSH EC2 Install Node.js and npm 2.1 Update system packages: sudo yum update sudo yum upgrade 2.2 Install Node.js and npm:\ncurl --silent --location https://rpm.nodesource.com/setup_20.x | bash - sudo yum -y install nodejs ** Check nodejs and npm version **\nnode -v npm -v Create user management project 3.1 Create a project directory: mkdir user-management cd user-management 3.2 Initialize the project: npm init -y 3.3 Install dependencies:\nnpm install express mysql2 redis dotenv express: Web framework. mysql2: MySQL client for connecting to RDS. redis: Redis client for ElastiCache. dotenv: For managing environment variables ** Check package.json ** cat package.json 3.4 Create Environment Variables\nCreate a .env file in the root directory to store environment variables. vi .env Add the following configuration to the .env file: DB_HOST=your-rds-endpoint DB_USER=your-db-username DB_PASSWORD=your-db-password DB_NAME=your-db-name REDIS_HOST=your-elasticache-endpoint REDIS_PORT=6379 3.5 Create the MySQL and Redis Connection\nCreate MySQL Connection vi db.js Add the following configuration const mysql = require(\u0026#39;mysql2/promise\u0026#39;); require(\u0026#39;dotenv\u0026#39;).config(); const pool = mysql.createPool({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, }); module.exports = pool; Create Redis Connection vi redis.js Add the following configuration const redis = require(\u0026#34;redis\u0026#34;); require(\u0026#34;dotenv\u0026#34;).config(); const client = redis.createClient({ url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}` }); client.on(\u0026#34;connect\u0026#34;, () =\u0026gt; { console.log(\u0026#34;Connected to Redis\u0026#34;); }); client.on(\u0026#34;error\u0026#34;, (err) =\u0026gt; { console.error(\u0026#34;Redis error:\u0026#34;, err); }); client.connect(); module.exports = client; 3.6 Build the User Management API\nCreate the main API in server.js. vi server.js Add code to file const express = require(\u0026#39;express\u0026#39;); const pool = require(\u0026#39;./db\u0026#39;); const redisClient = require(\u0026#39;./redis\u0026#39;); const app = express(); app.use(express.json()); // Get all users (with caching) app.get(\u0026#39;/users\u0026#39;, async (req, res) =\u0026gt; { try { const cacheKey = \u0026#39;users\u0026#39;; // Check Redis cache first const cachedUsers = await redisClient.get(cacheKey); if (cachedUsers) { return res.json(JSON.parse(cachedUsers)); } // If not in cache, query MySQL const [users] = await pool.query(\u0026#39;SELECT * FROM users\u0026#39;); // Cache the result in Redis for 60 seconds await redisClient.set(cacheKey, JSON.stringify(users), { EX: 60, }); res.json(users); } catch (err) { res.status(500).json({ error: \u0026#39;Failed to retrieve users\u0026#39; }); } }); // Create a new user app.post(\u0026#39;/users\u0026#39;, async (req, res) =\u0026gt; { const { name, email } = req.body; try { const [result] = await pool.query(\u0026#39;INSERT INTO users (name, email) VALUES (?, ?)\u0026#39;, [name, email]); // Invalidate cache await redisClient.del(\u0026#39;all_users\u0026#39;); res.status(201).json({ id: result.insertId, name, email }); } catch (err) { res.status(500).json({ error: \u0026#39;Failed to create user\u0026#39; }); } }); // Start the server const PORT = process.env.PORT || 3000; app.listen(PORT, () =\u0026gt; { console.log(`Server running on port ${PORT}`); }); "
+},
+{
+	"uri": "//localhost:1313/6-testing/",
+	"title": "Testing Result",
+	"tags": [],
+	"description": "",
+	"content": "6. Testing Result Send request to EC2 server to create user, when create user, cache is invalidate Check RDS Mysql Send request to EC2 server to get user, if redis is invalidate, write new data to redis Check Redis "
+},
+{
+	"uri": "//localhost:1313/",
+	"title": "Building a 3-Tier Application with Node.js, Express, EC2, AWS ElastiCache, and AWS RDS",
+	"tags": [],
+	"description": "",
+	"content": "Building a 3-Tier Application with Node.js, Express, EC2, AWS ElastiCache, and AWS RDS In this workshop, we will build a 3-tier web application using Node.js and Express. The application will be deployed on AWS EC2, with ElastiCache to enhance performance through caching, and RDS (Relational Database Service) to manage the database.\nA 3-tier architecture is a commonly used architectural model, divided into three main layers:\nPresentation Layer: This is the user interface of the application, which could be a website or mobile app. Application Layer: This contains the business logic of the application, typically implemented in server-side languages such as Node.js. Data Layer: This stores the application\u0026rsquo;s data, usually in a relational database like MySQL or PostgreSQL. In this workshop, we will use:\nNode.js and Express for the application layer. AWS EC2 instances to host the Node.js application. AWS RDS to manage the relational database. AWS ElastiCache to store cached data, improving data access performance. Through this workshop, you\u0026rsquo;ll learn how to deploy a complete web application and optimize its performance using AWS services.\n"
+},
+{
+	"uri": "//localhost:1313/categories/",
+	"title": "Categories",
+	"tags": [],
+	"description": "",
+	"content": ""
+},
+{
+	"uri": "//localhost:1313/tags/",
+	"title": "Tags",
+	"tags": [],
+	"description": "",
+	"content": ""
+}]
